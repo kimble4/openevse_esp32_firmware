@@ -84,6 +84,7 @@ void irc_event(JsonDocument &data) {
         if (state != _evse_state) {
             switch (state) {
                 case OPENEVSE_STATE_STARTING:
+                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is starting up...");
                     break;
                 case OPENEVSE_STATE_NOT_CONNECTED:
@@ -92,8 +93,10 @@ void irc_event(JsonDocument &data) {
                     } else if (_evse_state == OPENEVSE_STATE_SLEEPING) {
                         ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is waiting for a vehicle...");
                     }
+                    ircAway("EVSE is not connected.");
                     break;
                 case OPENEVSE_STATE_CONNECTED:
+                    ircUnAway();
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
                         ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "Vehicle is no longer charging.");
                     } else {
@@ -101,30 +104,39 @@ void irc_event(JsonDocument &data) {
                     }
                     break;
                 case OPENEVSE_STATE_CHARGING:
+                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_LIGHT_GREEN "Vehicle is charging...");
                     break;
                 case OPENEVSE_STATE_VENT_REQUIRED:
+                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Vehicle set 'vent required'");
                     break;
                 case OPENEVSE_STATE_DIODE_CHECK_FAILED:
+                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Diode check failed'");
                     break;
                 case OPENEVSE_STATE_GFI_FAULT:
+                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: GFI fault");
                     break;
                 case OPENEVSE_STATE_NO_EARTH_GROUND:
+                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: No ground");
                     break;
                 case OPENEVSE_STATE_STUCK_RELAY:
+                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Stuck relay");
                     break;
                 case OPENEVSE_STATE_GFI_SELF_TEST_FAILED:
+                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: GFI self-test failed");
                     break;
                 case OPENEVSE_STATE_OVER_TEMPERATURE:
+                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Over temperature");
                     break;
                 case OPENEVSE_STATE_OVER_CURRENT:
+                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Over current");
                     break;
                 case OPENEVSE_STATE_SLEEPING:
@@ -132,14 +144,17 @@ void irc_event(JsonDocument &data) {
                         ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "Vehicle is no longer charging.");
                     }
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is sleeping.");
+                    ircAway("EVSE is sleeping.");
                     break;
                 case OPENEVSE_STATE_DISABLED:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
                         ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "Vehicle is no longer charging.");
                     }
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is disabled.");
+                    ircAway("EVSE is disabled.");
                     break;
                 default:
+                    ircUnAway();
                     break;
                 }
             }
@@ -245,7 +260,6 @@ void printStatusToIRC(const char * target) {
 }
 
 void onIRCConnect() {
-    DEBUG_PORT.println("onIRCConnect");
     ircJoinChannel(IRC_CHANNEL);
 }
 
