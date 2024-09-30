@@ -65,6 +65,8 @@
 #include "legacy_support.h"
 #include "certificates.h"
 
+#include "irc.h"
+
 EventLog eventLog;
 CertificateStore certs;
 
@@ -191,6 +193,11 @@ void setup()
   lcd.display(F("OpenEVSE WiFI"), 0, 0, 0, LCD_CLEAR_LINE);
   lcd.display(currentfirmware, 0, 1, 5 * 1000, LCD_CLEAR_LINE);
 
+  //start the IRC bot
+#ifdef IRC_SERVER_0
+  irc_begin(evse);
+#endif //IRC_SERVER_0
+
   start_mem = last_mem = ESPAL.getFreeHeap();
 } // end setup
 
@@ -238,6 +245,9 @@ loop() {
     }
 
     mqtt_loop();
+  #ifdef IRC_SERVER_0
+    irc_loop();
+  #endif //IRC_SERVER_0
 
     // -------------------------------------------------------------------
     // Do these things once every 30 seconds
@@ -250,6 +260,10 @@ loop() {
           ohm_loop();
         }
       }
+      
+#ifdef IRC_SERVER_0
+      irc_check_connection();
+#endif //IRC_SERVER_0
 
       Timer1 = millis();
     }
@@ -302,6 +316,10 @@ void event_send(JsonDocument &event)
   yield();
   mqtt_publish(event);
   yield();
+#ifdef IRC_SERVER_0
+  irc_event(event);
+  yield();
+#endif //IRC_SERVER_0
 }
 
 void hardware_setup()
