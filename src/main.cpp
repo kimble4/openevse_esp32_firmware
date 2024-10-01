@@ -195,7 +195,7 @@ void setup()
 
   //start the IRC bot
 #ifdef IRC_SERVER_0
-  irc_begin(evse);
+  irc_begin(evse, net);
 #endif //IRC_SERVER_0
 
   start_mem = last_mem = ESPAL.getFreeHeap();
@@ -334,6 +334,7 @@ class SystemRestart : public MicroTasks::Alarm
     void Trigger()
     {
       DBUGLN("Restarting...");
+      irc_disconnect("Restarting...");
       evse.saveEnergyMeter();
       net.wifiStop();
       ESPAL.reset();

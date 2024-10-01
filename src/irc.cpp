@@ -12,6 +12,7 @@
 // copy https://github.com/kimble4/irc_client to 'lib'
 #include "irc_client.h"
 #include "evse_man.h"
+#include "net_manager.h"
 
 // Set these in platformio.ini:
 //   '-D IRC_SERVER_0="server0.example.com"'
@@ -35,6 +36,7 @@
 #define REPORT_CHARGE_FINISHED_CURRENT 0
 WiFiClient wifiClient_irc;
 EvseManager *_evse;
+NetManagerTask *_net;
 uint8_t _vehicle_connection_state = 0;
 uint8_t _evse_state = OPENEVSE_STATE_STARTING;
 uint8_t _pilot_amps = 0;
@@ -64,6 +66,41 @@ void get_scaled_number_value(double value, int precision, const char *unit, char
   snprintf(buffer, size, "%.*f %s%s", precision, value, mod[index], unit);
 }
 
+void setAwayStatusFromEVSEState(uint8_t state) {
+    switch (state) {
+        case OPENEVSE_STATE_STARTING:
+        case OPENEVSE_STATE_CONNECTED:
+        case OPENEVSE_STATE_CHARGING:
+        case OPENEVSE_STATE_VENT_REQUIRED:
+        case OPENEVSE_STATE_DIODE_CHECK_FAILED:
+        case OPENEVSE_STATE_GFI_FAULT:
+        case OPENEVSE_STATE_NO_EARTH_GROUND:
+        case OPENEVSE_STATE_STUCK_RELAY:
+        case OPENEVSE_STATE_GFI_SELF_TEST_FAILED:
+        case OPENEVSE_STATE_OVER_TEMPERATURE:
+        case OPENEVSE_STATE_OVER_CURRENT:
+            ircUnAway();
+            break;
+        case OPENEVSE_STATE_NOT_CONNECTED:
+            if (_evse_state == OPENEVSE_STATE_CHARGING) {
+                ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "Vehicle is no longer charging.");
+            } else if (_evse_state == OPENEVSE_STATE_SLEEPING) {
+                ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is waiting for a vehicle...");
+            }
+            ircAway("EVSE is not connected.");
+            break;
+        case OPENEVSE_STATE_SLEEPING:
+            ircAway("EVSE is sleeping.");
+            break;
+        case OPENEVSE_STATE_DISABLED:
+            ircAway("EVSE is disabled.");
+            break;
+        default:
+            ircUnAway();
+            break;
+        }
+}
+
 void irc_event(JsonDocument &data) {
     if (!ircConnected()) {
         return;
@@ -84,7 +121,6 @@ void irc_event(JsonDocument &data) {
         if (state != _evse_state) {
             switch (state) {
                 case OPENEVSE_STATE_STARTING:
-                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is starting up...");
                     break;
                 case OPENEVSE_STATE_NOT_CONNECTED:
@@ -93,10 +129,8 @@ void irc_event(JsonDocument &data) {
                     } else if (_evse_state == OPENEVSE_STATE_SLEEPING) {
                         ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is waiting for a vehicle...");
                     }
-                    ircAway("EVSE is not connected.");
                     break;
                 case OPENEVSE_STATE_CONNECTED:
-                    ircUnAway();
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
                         ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "Vehicle is no longer charging.");
                     } else {
@@ -104,61 +138,50 @@ void irc_event(JsonDocument &data) {
                     }
                     break;
                 case OPENEVSE_STATE_CHARGING:
-                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_LIGHT_GREEN "Vehicle is charging...");
                     break;
                 case OPENEVSE_STATE_VENT_REQUIRED:
-                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Vehicle set 'vent required'");
                     break;
                 case OPENEVSE_STATE_DIODE_CHECK_FAILED:
-                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Diode check failed'");
                     break;
                 case OPENEVSE_STATE_GFI_FAULT:
-                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: GFI fault");
                     break;
                 case OPENEVSE_STATE_NO_EARTH_GROUND:
-                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: No ground");
                     break;
                 case OPENEVSE_STATE_STUCK_RELAY:
-                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Stuck relay");
                     break;
                 case OPENEVSE_STATE_GFI_SELF_TEST_FAILED:
-                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: GFI self-test failed");
                     break;
                 case OPENEVSE_STATE_OVER_TEMPERATURE:
-                    ircUnAway();
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Over temperature");
                     break;
                 case OPENEVSE_STATE_OVER_CURRENT:
-                    ircUnAway();
-                    ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Over current");
+                      ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Over current");
                     break;
                 case OPENEVSE_STATE_SLEEPING:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
                         ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "Vehicle is no longer charging.");
                     }
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is sleeping.");
-                    ircAway("EVSE is sleeping.");
                     break;
                 case OPENEVSE_STATE_DISABLED:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
                         ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "Vehicle is no longer charging.");
                     }
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is disabled.");
-                    ircAway("EVSE is disabled.");
                     break;
                 default:
-                    ircUnAway();
                     break;
                 }
             }
             _evse_state = state;
+            setAwayStatusFromEVSEState(_evse_state);
         }
     }
     if (root["pilot"].is<int>()) {
@@ -200,7 +223,11 @@ void printStatusToIRC(const char * target) {
         snprintf(vehicle_string, sizeof(vehicle_string), IRC_COLOURS_GREEN "connected" IRC_COLOURS_NORMAL);
     }
     char buffer[100];
-    snprintf(buffer, sizeof(buffer), "Vehicle is %s.  Current limit is set to " IRC_COLOURS_BOLD "%uA", vehicle_string, _pilot_amps);
+    uint64_t up = uptimeMillis() / 1000;
+    uint32_t hours = up / 3600;
+    uint32_t minutes = (up % 3600) / 60;
+    uint32_t seconds = up % 60;
+    snprintf(buffer, sizeof(buffer), "Vehicle is %s.  Current limit " IRC_COLOURS_BOLD "%uA" IRC_COLOURS_NORMAL ", up: %d:%02d:%02d", vehicle_string, _pilot_amps, hours, minutes, seconds);
     ircSendMessage(target, buffer);
     switch (_evse_state) {
         case OPENEVSE_STATE_STARTING:
@@ -249,9 +276,9 @@ void printStatusToIRC(const char * target) {
             break;
         }
     uint32_t elapsed = _evse->getSessionElapsed();
-    uint32_t hours = elapsed / 3600;
-    uint32_t minutes = (elapsed % 3600) / 60;
-    uint32_t seconds = elapsed % 60;
+    hours = elapsed / 3600;
+    minutes = (elapsed % 3600) / 60;
+    seconds = elapsed % 60;
     char energy_buffer[10];
     get_scaled_number_value(_evse->getSessionEnergy(), 2, "Wh", energy_buffer, sizeof(energy_buffer));
     snprintf(buffer, sizeof(buffer), "%.1FC, %.1fV × %.2fA = " IRC_COLOURS_BOLD" %.2fkW" IRC_COLOURS_NORMAL ", Elapsed: %d:%02d:%02d, Delivered: %s",
@@ -261,10 +288,13 @@ void printStatusToIRC(const char * target) {
 
 void onIRCConnect() {
     ircJoinChannel(IRC_CHANNEL);
+    setAwayStatusFromEVSEState(_evse_state);
 }
 
 void onVoice(const char * from, const char * channel) {
-    ircSendMessage(channel, "OpenEVSE " ESCAPEQUOTE(BUILD_TAG));
+    char buffer[100];
+    snprintf(buffer, sizeof(buffer), "OpenEVSE " ESCAPEQUOTE(BUILD_TAG) " http://%s", _net->getIp().c_str());
+    ircSendMessage(channel, buffer);
     printStatusToIRC(channel);
 }
 
@@ -362,8 +392,9 @@ void onChannelMessage(const char * from, const char * channel, const char * mess
     }
 }
 
-void irc_begin(EvseManager &evse) {
+void irc_begin(EvseManager &evse, NetManagerTask &net) {
     _evse = &evse;
+    _net = &net;
     ircSetClient(wifiClient_irc);
     ircSetDebug(onIRCDebug);
     ircSetOnPrivateMessage(onPrivateMessage);
@@ -397,7 +428,9 @@ void irc_check_connection() {
 }
 
 
-
+void irc_disconnect(const char * reason) {
+    ircDisconnect(reason);
+}
 
 // -------------------------------------------------------------------
 // IRC state management
