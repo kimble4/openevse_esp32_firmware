@@ -281,7 +281,7 @@ void printStatusToIRC(const char * target) {
     seconds = elapsed % 60;
     char energy_buffer[10];
     get_scaled_number_value(_evse->getSessionEnergy(), 2, "Wh", energy_buffer, sizeof(energy_buffer));
-    snprintf(buffer, sizeof(buffer), "%.1FC, %.1fV × %.2fA = " IRC_COLOURS_BOLD" %.2fkW" IRC_COLOURS_NORMAL ", Elapsed: %d:%02d:%02d, Delivered: %s",
+    snprintf(buffer, sizeof(buffer), "%.1FC, %.1fV × %.2fA = " IRC_COLOURS_BOLD "%.2fkW" IRC_COLOURS_NORMAL ", Elapsed: %d:%02d:%02d, Delivered: %s",
         _evse->getTemperature(EVSE_MONITOR_TEMP_MONITOR), _evse->getVoltage(), _evse->getAmps(), _evse->getPower()/1000.0, hours, minutes, seconds, energy_buffer);
     ircSendMessage(target, buffer);
 }
