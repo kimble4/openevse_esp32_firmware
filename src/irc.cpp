@@ -104,9 +104,6 @@ void setAwayStatusFromEVSEState(uint8_t state) {
 }
 
 void irc_event(JsonDocument &data) {
-    if (!ircConnected()) {
-        return;
-    }
     JsonObject root = data.as<JsonObject>();
     if (root["vehicle"].is<int>()) {
         uint8_t vehicle = root["vehicle"];
