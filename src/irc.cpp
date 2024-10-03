@@ -412,7 +412,7 @@ void irc_begin(EvseManager &evse, NetManagerTask &net) {
     #define TEXTIFY(A) #A
     #define ESCAPEQUOTE(A) TEXTIFY(A)
     ircSetVersion("OpenEVSE " ESCAPEQUOTE(BUILD_TAG));
-#ifdef NICKSERV_PASSWORD
+#ifdef IRC_NICKSERV_PASSWORD
     ircSetNickServPassword(IRC_NICKSERV_PASSWORD);
 #endif
 #ifdef IRC_SERVER_PASSWORD
