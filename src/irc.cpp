@@ -34,6 +34,7 @@
 
 #define REPORT_CURRENT_DELTA 1.0
 #define REPORT_CHARGE_FINISHED_CURRENT 0
+#define TAKING_CHARGE_CURRENT_THRESHOLD 2.0
 WiFiClient wifiClient_irc;
 EvseManager *_evse;
 NetManagerTask *_net;
@@ -43,7 +44,8 @@ uint8_t _pilot_amps = 0;
 double _amp = 0.0;
 double _amp_last_reported = 0.0;
 #ifdef IRC_SERVER_1
-bool _use_backup_irc_server = 0;
+bool _use_backup_irc_server = false;
+bool _taking_charge = false;
 #endif 
 
 void get_scaled_number_value(double value, int precision, const char *unit, char *buffer, size_t size) {
@@ -102,9 +104,6 @@ void setAwayStatusFromEVSEState(uint8_t state) {
 }
 
 void irc_event(JsonDocument &data) {
-    if (!ircConnected()) {
-        return;
-    }
     JsonObject root = data.as<JsonObject>();
     if (root["vehicle"].is<int>()) {
         uint8_t vehicle = root["vehicle"];
@@ -202,7 +201,7 @@ void irc_event(JsonDocument &data) {
                 ircSendMessage(IRC_CHANNEL, buffer);
                 _amp_last_reported = amp;
             }       
-            if (amp < _amp && amp <= REPORT_CHARGE_FINISHED_CURRENT * AMPS_SCALE_FACTOR) {  //is below finished threshold
+            if (_taking_charge && amp < _amp && amp <= REPORT_CHARGE_FINISHED_CURRENT * AMPS_SCALE_FACTOR) {  //is below finished threshold
                 char buffer[100];
                 if (_evse_state == OPENEVSE_STATE_CHARGING) {
                     snprintf(buffer, sizeof(buffer), "Charging has finished! (Current <= %.2fA)", REPORT_CHARGE_FINISHED_CURRENT);
@@ -211,6 +210,10 @@ void irc_event(JsonDocument &data) {
                 }
                 ircSendNotice(IRC_CHANNEL, buffer);
                 _amp_last_reported = amp;
+                _taking_charge = false;
+            }
+            if (amp >= TAKING_CHARGE_CURRENT_THRESHOLD) {
+                _taking_charge = true;
             }
             _amp = amp;
         }
@@ -406,8 +409,11 @@ void irc_begin(EvseManager &evse, NetManagerTask &net) {
     #define TEXTIFY(A) #A
     #define ESCAPEQUOTE(A) TEXTIFY(A)
     ircSetVersion("OpenEVSE " ESCAPEQUOTE(BUILD_TAG));
-#ifdef NICKSERV_PASSWORD
-    ircSetNickServPassword(NICKSERV_PASSWORD);
+#ifdef IRC_NICKSERV_PASSWORD
+    ircSetNickServPassword(IRC_NICKSERV_PASSWORD);
+#endif
+#ifdef IRC_SERVER_PASSWORD
+    ircSetServerPassword(IRC_SERVER_PASSWORD);
 #endif
 }
 
