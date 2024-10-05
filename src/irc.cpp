@@ -230,7 +230,7 @@ void printStatusToIRC(const char * target) {
     uint32_t hours = up / 3600;
     uint32_t minutes = (up % 3600) / 60;
     uint32_t seconds = up % 60;
-    snprintf(buffer, sizeof(buffer), "Vehicle is %s.  Current limit " IRC_COLOURS_BOLD "%uA" IRC_COLOURS_NORMAL ", up: %d:%02d:%02d", vehicle_string, _pilot_amps, hours, minutes, seconds);
+    snprintf(buffer, sizeof(buffer), "Vehicle is %s.  Current limit " IRC_COLOURS_BOLD "%uA" IRC_COLOURS_NORMAL ", up: %d:%02d:%02d, RSSI: %ddB", vehicle_string, _pilot_amps, hours, minutes, seconds, WiFi.RSSI());
     ircSendMessage(target, buffer);
     switch (_evse_state) {
         case OPENEVSE_STATE_STARTING:
