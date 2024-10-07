@@ -213,6 +213,27 @@ void mqttmsg_callback(MongooseString topic, MongooseString payload) {
     }
   }
 
+  else if (topic_string == mqtt_topic + "/temp1/set")  {
+    double t = payload_str.toFloat();
+    DBUGF("temp1:%.1f", t);
+    evse.setTemperature(EVSE_MONITOR_TEMP_EVSE_DS3232, t);
+  }
+  else if (topic_string == mqtt_topic + "/temp2/set")  {
+    double t = payload_str.toFloat();
+    DBUGF("temp1:%.1f", t);
+    evse.setTemperature(EVSE_MONITOR_TEMP_EVSE_MCP9808, t);
+  }
+  else if (topic_string == mqtt_topic + "/temp3/set")  {
+    double t = payload_str.toFloat();
+    DBUGF("temp1:%.1f", t);
+    evse.setTemperature(EVSE_MONITOR_TEMP_EVSE_TMP007, t);
+  }
+  else if (topic_string == mqtt_topic + "/temp4/set")  {
+    double t = payload_str.toFloat();
+    DBUGF("temp1:%.1f", t);
+    evse.setTemperature(EVSE_MONITOR_TEMP_ESP_MCP9808, t);
+  }
+
   // Restart
   else if (topic_string == mqtt_topic + "/restart") {
     mqtt_restart_device(payload_str);
@@ -448,6 +469,22 @@ mqtt_connect()
     yield();
 
     mqtt_sub_topic = mqtt_topic + "/config/set";
+    mqttclient.subscribe(mqtt_sub_topic);
+    yield();
+
+    mqtt_sub_topic = mqtt_topic + "/temp1/set";
+    mqttclient.subscribe(mqtt_sub_topic);
+    yield();
+
+    mqtt_sub_topic = mqtt_topic + "/temp2/set";
+    mqttclient.subscribe(mqtt_sub_topic);
+    yield();
+
+    mqtt_sub_topic = mqtt_topic + "/temp3/set";
+    mqttclient.subscribe(mqtt_sub_topic);
+    yield();
+
+    mqtt_sub_topic = mqtt_topic + "/temp4/set";
     mqttclient.subscribe(mqtt_sub_topic);
     yield();
 
