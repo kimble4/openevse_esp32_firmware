@@ -84,11 +84,6 @@ void setAwayStatusFromEVSEState(uint8_t state) {
             ircUnAway();
             break;
         case OPENEVSE_STATE_NOT_CONNECTED:
-            if (_evse_state == OPENEVSE_STATE_CHARGING) {
-                ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "Vehicle is no longer charging.");
-            } else if (_evse_state == OPENEVSE_STATE_SLEEPING) {
-                ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is waiting for a vehicle...");
-            }
             ircAway("EVSE is not connected.");
             break;
         case OPENEVSE_STATE_SLEEPING:
@@ -124,20 +119,20 @@ void irc_event(JsonDocument &data) {
                     break;
                 case OPENEVSE_STATE_NOT_CONNECTED:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
-                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "Vehicle is no longer charging.");
+                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "EVSE is no longer suppying power.");
                     } else if (_evse_state == OPENEVSE_STATE_SLEEPING) {
                         ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is waiting for a vehicle...");
                     }
                     break;
                 case OPENEVSE_STATE_CONNECTED:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
-                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "Vehicle is no longer charging.");
+                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "EVSE is no longer supplying power.");
                     } else {
-                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is ready to charge.");
+                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is ready to supply power.");
                     }
                     break;
                 case OPENEVSE_STATE_CHARGING:
-                    ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_LIGHT_GREEN "Vehicle is charging...");
+                    ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_LIGHT_GREEN "EVSE is supplying power...");
                     break;
                 case OPENEVSE_STATE_VENT_REQUIRED:
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Vehicle set 'vent required'");
@@ -165,13 +160,13 @@ void irc_event(JsonDocument &data) {
                     break;
                 case OPENEVSE_STATE_SLEEPING:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
-                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "Vehicle is no longer charging.");
+                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "EVSE is no longer supplying power.");
                     }
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is sleeping.");
                     break;
                 case OPENEVSE_STATE_DISABLED:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
-                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "Vehicle is no longer charging.");
+                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "EVSE is no longer supplying power.");
                     }
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is disabled.");
                     break;
@@ -197,7 +192,7 @@ void irc_event(JsonDocument &data) {
         if (amp != _amp) {  //current has changed
             if (abs(amp - _amp_last_reported) > REPORT_CURRENT_DELTA * AMPS_SCALE_FACTOR) {  //by enough to report
                 char buffer[100];
-                snprintf(buffer, sizeof(buffer), "Current is: %.2fA", amp/AMPS_SCALE_FACTOR);
+                snprintf(buffer, sizeof(buffer), "Current is now: %.2fA", amp/AMPS_SCALE_FACTOR);
                 ircSendMessage(IRC_CHANNEL, buffer);
                 _amp_last_reported = amp;
             }       
@@ -240,10 +235,10 @@ void printStatusToIRC(const char * target) {
             ircSendMessage(target, IRC_COLOURS_BOLD "EVSE is " IRC_COLOURS_GREEN "waiting for a vehicle...");
             break;
         case OPENEVSE_STATE_CONNECTED:
-            ircSendMessage(target, IRC_COLOURS_BOLD "EVSE is " IRC_COLOURS_GREEN "ready to charge.");
+            ircSendMessage(target, IRC_COLOURS_BOLD "EVSE is " IRC_COLOURS_GREEN "ready to supply power.");
             break;
         case OPENEVSE_STATE_CHARGING:
-            ircSendMessage(target, IRC_COLOURS_BOLD "EVSE is " IRC_COLOURS_YELLOW "charging...");
+            ircSendMessage(target, IRC_COLOURS_BOLD "EVSE is " IRC_COLOURS_YELLOW "supplying power...");
             break;
         case OPENEVSE_STATE_VENT_REQUIRED:
             ircSendMessage(target, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Vehicle set 'vent required'");
