@@ -765,7 +765,7 @@ void EvseMonitor::getStatusFromEvse(bool allowStart)
 
 void EvseMonitor::getChargeCurrentAndVoltageFromEvse()
 {
-  if(_state.isCharging())
+  if(_state.isCharging() || time(NULL) % 30 == 0)
   {
     DBUGLN("Get charge current/voltage status");
     _openevse.getChargeCurrentAndVoltage([this](int ret, double a, double volts)
