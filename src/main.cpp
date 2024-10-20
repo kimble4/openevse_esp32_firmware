@@ -347,7 +347,9 @@ class SystemRestart : public MicroTasks::Alarm
     void Trigger()
     {
       DBUGLN("Restarting...");
+#ifdef IRC_SERVER_0
       irc_disconnect("Restarting...");
+#endif //IRC_SERVER_0
       evse.saveEnergyMeter();
       net.wifiStop();
       ESPAL.reset();

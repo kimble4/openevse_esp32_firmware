@@ -318,6 +318,9 @@ class EvseManager : public MicroTasks::Task
     void setVoltage(double volts) {
       _monitor.setVoltage(volts);
     }
+    void setTemperature(int sensor, double temp) {
+      _monitor.setTemperature(sensor, temp);
+    }
     uint32_t getSessionElapsed() {
       return _monitor.getSessionElapsed();
     }

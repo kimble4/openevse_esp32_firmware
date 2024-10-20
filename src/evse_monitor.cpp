@@ -542,6 +542,50 @@ void EvseMonitor::setVoltage(double volts, std::function<void(int ret)> callback
   }
 }
 
+void EvseMonitor::setTemperature(int sensor, double temperature, std::function<void(int ret)> callback)
+{
+  if(_temps[sensor].isValid() && temperature == _temps[sensor].get())
+  {
+    if(callback) {
+      callback(RAPI_RESPONSE_OK);
+    }
+    return;
+  }
+
+  _openevse.setTemperature(sensor, temperature, [this, sensor, temperature, callback](int ret)
+  {
+    if(RAPI_RESPONSE_OK == ret) {
+      _temps[sensor].set(temperature);
+      long temp = temperature * 10.0 + 0.5;
+      StaticJsonDocument<128> event;
+      switch (sensor) {
+        case EVSE_MONITOR_TEMP_EVSE_DS3232:
+          event["temp1"] = temp;
+          event_send(event);
+          break;
+        case EVSE_MONITOR_TEMP_EVSE_MCP9808:
+          event["temp2"] = temp;
+          event_send(event);
+          break;
+        case EVSE_MONITOR_TEMP_EVSE_TMP007:
+          event["temp3"] = temp;
+          event_send(event);
+          break;
+        case EVSE_MONITOR_TEMP_ESP_MCP9808:
+          event["temp4"] = temp;
+          event_send(event);
+          break;
+        default:
+          break;
+      }
+    }
+    if(callback) {
+      callback(ret);
+    }
+  });
+}
+
+
 void EvseMonitor::setServiceLevel(ServiceLevel level, std::function<void(int ret)> callback)
 {
   if(level == getServiceLevel())
@@ -721,7 +765,7 @@ void EvseMonitor::getStatusFromEvse(bool allowStart)
 
 void EvseMonitor::getChargeCurrentAndVoltageFromEvse()
 {
-  if(_state.isCharging())
+  if(_state.isCharging() || time(NULL) % 30 == 0)
   {
     DBUGLN("Get charge current/voltage status");
     _openevse.getChargeCurrentAndVoltage([this](int ret, double a, double volts)
