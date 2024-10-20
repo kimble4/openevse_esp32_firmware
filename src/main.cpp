@@ -100,6 +100,14 @@ OcppTask ocpp = OcppTask();
 static void hardware_setup();
 static void handle_serial();
 
+unsigned long _last_knock = 0;
+
+#ifdef KNOCK_SENSOR_PIN
+void IRAM_ATTR knockSensorISR() {
+  _last_knock = millis();
+}
+#endif //KNOCK_SENSOR_PIN
+
 // -------------------------------------------------------------------
 // SETUP
 // -------------------------------------------------------------------
@@ -147,7 +155,7 @@ void setup()
   limit.begin(evse);
   DBUGF("After limit.begin: %d", ESPAL.getFreeHeap());
 
-  lcd.begin(evse, scheduler, manual);
+  lcd.begin(evse, scheduler, manual, _last_knock);
   DBUGF("After lcd.begin: %d", ESPAL.getFreeHeap());
 
 #if defined(ENABLE_PN532)
@@ -197,6 +205,11 @@ void setup()
 #ifdef IRC_SERVER_0
   irc_begin(evse, net);
 #endif //IRC_SERVER_0
+
+#ifdef KNOCK_SENSOR_PIN
+  pinMode(KNOCK_SENSOR_PIN, INPUT_PULLUP); // Configure the pin as an input with an internal pull-up resistor
+  attachInterrupt(digitalPinToInterrupt(KNOCK_SENSOR_PIN), knockSensorISR, CHANGE); // Configure the interrupt
+#endif //KNOCK_SENSOR_PIN
 
   start_mem = last_mem = ESPAL.getFreeHeap();
 } // end setup
