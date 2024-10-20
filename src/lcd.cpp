@@ -119,7 +119,7 @@ void LcdTask::setInfoLine(LcdInfoLine info)
   }
 }
 
-void LcdTask::begin(EvseManager &evse, Scheduler &scheduler, ManualOverride &manual)
+void LcdTask::begin(EvseManager &evse, Scheduler &scheduler, ManualOverride &manual, unsigned long &last_knock)
 {
   _evse = &evse;
   _scheduler = &scheduler;

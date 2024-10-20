@@ -65,6 +65,8 @@
 #include "legacy_support.h"
 #include "certificates.h"
 
+#include "irc.h"
+
 EventLog eventLog;
 CertificateStore certs;
 
@@ -97,6 +99,14 @@ OcppTask ocpp = OcppTask();
 
 static void hardware_setup();
 static void handle_serial();
+
+unsigned long _last_knock = 0;
+
+#ifdef KNOCK_SENSOR_PIN
+void IRAM_ATTR knockSensorISR() {
+  _last_knock = millis();
+}
+#endif //KNOCK_SENSOR_PIN
 
 // -------------------------------------------------------------------
 // SETUP
@@ -145,7 +155,7 @@ void setup()
   limit.begin(evse);
   DBUGF("After limit.begin: %d", ESPAL.getFreeHeap());
 
-  lcd.begin(evse, scheduler, manual);
+  lcd.begin(evse, scheduler, manual, _last_knock);
   DBUGF("After lcd.begin: %d", ESPAL.getFreeHeap());
 
 #if defined(ENABLE_PN532)
@@ -190,6 +200,16 @@ void setup()
 
   lcd.display(F("OpenEVSE WiFI"), 0, 0, 0, LCD_CLEAR_LINE);
   lcd.display(currentfirmware, 0, 1, 5 * 1000, LCD_CLEAR_LINE);
+
+  //start the IRC bot
+#ifdef IRC_SERVER_0
+  irc_begin(evse, net);
+#endif //IRC_SERVER_0
+
+#ifdef KNOCK_SENSOR_PIN
+  pinMode(KNOCK_SENSOR_PIN, INPUT_PULLUP); // Configure the pin as an input with an internal pull-up resistor
+  attachInterrupt(digitalPinToInterrupt(KNOCK_SENSOR_PIN), knockSensorISR, CHANGE); // Configure the interrupt
+#endif //KNOCK_SENSOR_PIN
 
   start_mem = last_mem = ESPAL.getFreeHeap();
 } // end setup
@@ -238,6 +258,9 @@ loop() {
     }
 
     mqtt_loop();
+  #ifdef IRC_SERVER_0
+    irc_loop();
+  #endif //IRC_SERVER_0
 
     // -------------------------------------------------------------------
     // Do these things once every 30 seconds
@@ -250,6 +273,10 @@ loop() {
           ohm_loop();
         }
       }
+      
+#ifdef IRC_SERVER_0
+      irc_check_connection();
+#endif //IRC_SERVER_0
 
       Timer1 = millis();
     }
@@ -302,6 +329,10 @@ void event_send(JsonDocument &event)
   yield();
   mqtt_publish(event);
   yield();
+#ifdef IRC_SERVER_0
+  irc_event(event);
+  yield();
+#endif //IRC_SERVER_0
 }
 
 void hardware_setup()
@@ -316,6 +347,7 @@ class SystemRestart : public MicroTasks::Alarm
     void Trigger()
     {
       DBUGLN("Restarting...");
+      irc_disconnect("Restarting...");
       evse.saveEnergyMeter();
       net.wifiStop();
       ESPAL.reset();
