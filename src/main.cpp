@@ -203,7 +203,7 @@ void setup()
 
   //start the IRC bot
 #ifdef IRC_SERVER_0
-  irc_begin(evse, net);
+  irc_begin(evse, net, lcd, manual);
 #endif //IRC_SERVER_0
 
 #ifdef KNOCK_SENSOR_PIN
