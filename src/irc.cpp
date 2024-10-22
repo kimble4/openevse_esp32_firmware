@@ -43,6 +43,8 @@
 WiFiClient wifiClient_irc;
 EvseManager *_evse;
 NetManagerTask *_net;
+LcdTask *_lcd;
+ManualOverride *_manual;
 uint8_t _vehicle_connection_state = 0;
 uint8_t _evse_state = OPENEVSE_STATE_STARTING;
 uint8_t _pilot_amps = 0;
@@ -122,16 +124,16 @@ void printStatusToIRC(const char * target, bool full) {
         ircSendMessage(target, buffer);
         switch (_evse_state) {
             case OPENEVSE_STATE_STARTING:
-                ircSendMessage(target, IRC_COLOURS_BOLD "EVSE is " IRC_COLOURS_ORANGE "starting up...");
+                ircSendMessage(target, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_ORANGE "starting up...");
                 break;
             case OPENEVSE_STATE_NOT_CONNECTED:
-                ircSendMessage(target, IRC_COLOURS_BOLD "EVSE is " IRC_COLOURS_GREEN "waiting for a vehicle...");
+                ircSendMessage(target, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_GREEN "waiting for a vehicle...");
                 break;
             case OPENEVSE_STATE_CONNECTED:
-                ircSendMessage(target, IRC_COLOURS_BOLD "EVSE is " IRC_COLOURS_GREEN "ready to supply power.");
+                ircSendMessage(target, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_GREEN "ready to supply power.");
                 break;
             case OPENEVSE_STATE_CHARGING:
-                ircSendMessage(target, IRC_COLOURS_BOLD "EVSE is " IRC_COLOURS_YELLOW "supplying power...");
+                ircSendMessage(target, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_YELLOW "supplying power...");
                 break;
             case OPENEVSE_STATE_VENT_REQUIRED:
                 ircSendMessage(target, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Vehicle set 'vent required'");
@@ -158,10 +160,10 @@ void printStatusToIRC(const char * target, bool full) {
                 ircSendMessage(target, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Over current");
                 break;
             case OPENEVSE_STATE_SLEEPING:
-                ircSendMessage(target, IRC_COLOURS_BOLD "EVSE is sleeping.");
+                ircSendMessage(target, "EVSE is " IRC_COLOURS_ORANGE "sleeping.");
                 break;
             case OPENEVSE_STATE_DISABLED:
-                ircSendMessage(target, IRC_COLOURS_BOLD "EVSE is disabled.");
+                ircSendMessage(target, "EVSE is " IRC_COLOURS_ORANGE "disabled.");
                 break;
             default:
                 break;
@@ -195,24 +197,24 @@ void irc_event(JsonDocument &data) {
         if (state != _evse_state) {
             switch (state) {
                 case OPENEVSE_STATE_STARTING:
-                    ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is starting up...");
+                    ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_ORANGE "starting up...");
                     break;
                 case OPENEVSE_STATE_NOT_CONNECTED:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
-                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "EVSE is no longer suppying power.");
+                        ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer suppying power.");
                     } else if (_evse_state == OPENEVSE_STATE_SLEEPING) {
-                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is waiting for a vehicle...");
+                        ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_ORANGE "waiting for a vehicle...");
                     }
                     break;
                 case OPENEVSE_STATE_CONNECTED:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
-                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "EVSE is no longer supplying power.");
+                        ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer supplying power.");
                     } else {
-                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is ready to supply power.");
+                        ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_ORANGE "ready to supply power.");
                     }
                     break;
                 case OPENEVSE_STATE_CHARGING:
-                    ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_LIGHT_GREEN "EVSE is supplying power...");
+                    ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_LIGHT_GREEN "supplying power...");
                     break;
                 case OPENEVSE_STATE_VENT_REQUIRED:
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Vehicle set 'vent required'");
@@ -240,15 +242,15 @@ void irc_event(JsonDocument &data) {
                     break;
                 case OPENEVSE_STATE_SLEEPING:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
-                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "EVSE is no longer supplying power.");
+                        ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer supplying power.");
                     }
-                    ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is sleeping.");
+                    ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_ORANGE "sleeping.");
                     break;
                 case OPENEVSE_STATE_DISABLED:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
-                        ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "EVSE is no longer supplying power.");
+                        ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer supplying power.");
                     }
-                    ircSendMessage(IRC_CHANNEL, IRC_COLOURS_ORANGE "EVSE is disabled.");
+                    ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_ORANGE "disabled.");
                     break;
                 default:
                     break;
@@ -345,12 +347,28 @@ void onPrivateMessage(const char * from, const char * message) {
         ircSendMessage(from, F(IRC_COLOURS_UNDERLINE "I understand the following commands:"));
         ircSendMessage(from, F("help                         - Print this help."));
         ircSendMessage(from, F("status                       - Print status."));
+        ircSendMessage(from, F("toggle                       - Toggle manual override."));
+        ircSendMessage(from, F("wakeup                       - Wake the LCD backlight."));
         return;
     }
     pch = strstr_P(command, "status");  //status
     if (pch != NULL) {
         DEBUG_PORT.println("[IRC] Got status command");
         printStatusToIRC(from, true);
+        return;    
+    }
+    pch = strstr_P(command, "toggle");  //toggle manual override
+    if (pch != NULL) {
+        DEBUG_PORT.println("[IRC] Got toggle command");
+        ircSendMessage(from, F("Toggling override..."));
+        _manual->toggle();
+        return;    
+    }
+    pch = strstr_P(command, "wakeup");  //wake lcd
+    if (pch != NULL) {
+        DEBUG_PORT.println("[IRC] Got wakeup command");
+        ircSendMessage(from, F("Waking display..."));
+        _lcd->wakeBacklight();
         return;    
     }
 }
@@ -389,6 +407,8 @@ void onChannelMessage(const char * from, const char * channel, const char * mess
                 ircSendMessage(channel, F(IRC_COLOURS_UNDERLINE "I understand the following commands:"));
                 ircSendMessage(channel, F("help                         - Print this help."));
                 ircSendMessage(channel, F("status                       - Print status."));
+                ircSendMessage(channel, F("toggle                       - Toggle manual override."));
+                ircSendMessage(channel, F("wakeup                       - Wake the LCD backlight."));
                 return;
             }
             pch = strstr_P(command, "status");  //status
@@ -397,13 +417,29 @@ void onChannelMessage(const char * from, const char * channel, const char * mess
                 printStatusToIRC(channel, true);
                 return;    
             }
+            pch = strstr_P(command, "toggle");  //toggle manual override
+            if (pch != NULL) {
+                DEBUG_PORT.println("[IRC] Got toggle command");
+                ircSendMessage(channel, F("Toggling override..."));
+                _manual->toggle();
+                return;    
+            }
+            pch = strstr_P(command, "wakeup");  //status
+            if (pch != NULL) {
+                DEBUG_PORT.println("[IRC] Got wakeup command");
+                ircSendMessage(channel, F("Waking display..."));
+                _lcd->wakeBacklight();
+                return;    
+            }
         }
     }
 }
 
-void irc_begin(EvseManager &evse, NetManagerTask &net) {
+void irc_begin(EvseManager &evse, NetManagerTask &net, LcdTask &lcd, ManualOverride &manual) {
     _evse = &evse;
     _net = &net;
+    _lcd = &lcd;
+    _manual = &manual;
     ircSetClient(wifiClient_irc);
     ircSetDebug(onIRCDebug);
     ircSetOnPrivateMessage(onPrivateMessage);
