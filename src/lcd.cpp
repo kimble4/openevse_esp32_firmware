@@ -119,7 +119,7 @@ void LcdTask::setInfoLine(LcdInfoLine info)
   }
 }
 
-void LcdTask::begin(EvseManager &evse, Scheduler &scheduler, ManualOverride &manual)
+void LcdTask::begin(EvseManager &evse, Scheduler &scheduler, ManualOverride &manual, unsigned long &last_knock)
 {
   _evse = &evse;
   _scheduler = &scheduler;
@@ -733,6 +733,11 @@ void LcdTask::onButton(int long_press)
   {
     _manual->toggle();
   }
+}
+
+void LcdTask::setWifiMode(bool client, bool connected)
+{
+//only used by the TFT display
 }
 
 LcdTask lcd;

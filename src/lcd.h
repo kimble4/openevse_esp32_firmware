@@ -129,6 +129,7 @@ class LcdTask : public MicroTasks::Task
     void setInfoLine(LcdInfoLine info);
 
     void onButton(int event);
+    
 
     LcdInfoLine getNextInfoLine(LcdInfoLine info);
 
@@ -149,11 +150,13 @@ class LcdTask : public MicroTasks::Task
   public:
     LcdTask();
 
-    void begin(EvseManager &evse, Scheduler &scheduler, ManualOverride &manual);
+    void begin(EvseManager &evse, Scheduler &scheduler, ManualOverride &manual, unsigned long &last_knock);
 
     void display(const __FlashStringHelper *msg, int x, int y, int time, uint32_t flags);
     void display(String &msg, int x, int y, int time, uint32_t flags);
     void display(const char *msg, int x, int y, int time, uint32_t flags);
+    
+    void setWifiMode(bool client, bool connected);
 };
 
 #endif // ENABLE_SCREEN_LCD_TFT
