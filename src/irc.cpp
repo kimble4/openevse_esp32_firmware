@@ -33,7 +33,7 @@
 #endif
 
 #ifndef IRC_STATUS_INTERVAL
-#define IRC_STATUS_INTERVAL 3600  //report status every this many seconds
+#define IRC_STATUS_INTERVAL 3600  //report status every this many elapsed seconds
 #endif
 
 #define REPORT_RATE_LIMIT 5000  //ms
@@ -45,14 +45,16 @@ EvseManager *_evse;
 NetManagerTask *_net;
 LcdTask *_lcd;
 ManualOverride *_manual;
+unsigned long *_got_last_knock;
+uint32_t _last_second = 0;
 uint8_t _vehicle_connection_state = 0;
 uint8_t _evse_state = OPENEVSE_STATE_STARTING;
 uint8_t _pilot_amps = 0;
 double _amp = 0.0;
 double _amp_last_reported = 0.0;
+bool _taking_charge = false;
 #ifdef IRC_SERVER_1
 bool _use_backup_irc_server = false;
-bool _taking_charge = false;
 #endif 
 
 void get_scaled_number_value(double value, int precision, const char *unit, char *buffer, size_t size) {
@@ -124,16 +126,16 @@ void printStatusToIRC(const char * target, bool full) {
         ircSendMessage(target, buffer);
         switch (_evse_state) {
             case OPENEVSE_STATE_STARTING:
-                ircSendMessage(target, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_ORANGE "starting up...");
+                ircSendAction(target, "is " IRC_COLOURS_BOLD IRC_COLOURS_ORANGE "starting up...");
                 break;
             case OPENEVSE_STATE_NOT_CONNECTED:
-                ircSendMessage(target, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_GREEN "waiting for a vehicle...");
+                ircSendAction(target, "is " IRC_COLOURS_BOLD IRC_COLOURS_GREEN "waiting for a vehicle...");
                 break;
             case OPENEVSE_STATE_CONNECTED:
-                ircSendMessage(target, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_GREEN "ready to supply power.");
+                ircSendAction(target, "is " IRC_COLOURS_BOLD IRC_COLOURS_GREEN "ready to supply power.");
                 break;
             case OPENEVSE_STATE_CHARGING:
-                ircSendMessage(target, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_YELLOW "supplying power...");
+                ircSendAction(target, "is " IRC_COLOURS_BOLD IRC_COLOURS_YELLOW "supplying power...");
                 break;
             case OPENEVSE_STATE_VENT_REQUIRED:
                 ircSendMessage(target, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Vehicle set 'vent required'");
@@ -160,10 +162,10 @@ void printStatusToIRC(const char * target, bool full) {
                 ircSendMessage(target, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Over current");
                 break;
             case OPENEVSE_STATE_SLEEPING:
-                ircSendMessage(target, "EVSE is " IRC_COLOURS_ORANGE "sleeping.");
+                ircSendAction(target, "is " IRC_COLOURS_ORANGE "sleeping.");
                 break;
             case OPENEVSE_STATE_DISABLED:
-                ircSendMessage(target, "EVSE is " IRC_COLOURS_ORANGE "disabled.");
+                ircSendAction(target, "is " IRC_COLOURS_ORANGE "disabled.");
                 break;
             default:
                 break;
@@ -175,7 +177,7 @@ void printStatusToIRC(const char * target, bool full) {
     seconds = t % 60;
     char energy_buffer[10];
     get_scaled_number_value(_evse->getSessionEnergy(), 2, "Wh", energy_buffer, sizeof(energy_buffer));
-    snprintf(buffer, sizeof(buffer), "%.1FC, %.1fV × %.2fA = " IRC_COLOURS_BOLD "%.2fkW" IRC_COLOURS_NORMAL ", Elapsed: %d:%02d:%02d, Delivered: " IRC_COLOURS_BOLD "%s" IRC_COLOURS_NORMAL,
+    snprintf(buffer, sizeof(buffer), "%.1FC, %.1fV × %.2fA = " IRC_COLOURS_BOLD "%.2fkW" IRC_COLOURS_NORMAL ", Elapsed: " IRC_COLOURS_BOLD "%d:%02d:%02d" IRC_COLOURS_NORMAL ", Delivered: " IRC_COLOURS_BOLD "%s" IRC_COLOURS_NORMAL,
         _evse->getTemperature(EVSE_MONITOR_TEMP_MONITOR), _evse->getVoltage(), _evse->getAmps(), _evse->getPower()/1000.0, hours, minutes, seconds, energy_buffer);
     ircSendMessage(target, buffer);
 }
@@ -197,24 +199,24 @@ void irc_event(JsonDocument &data) {
         if (state != _evse_state) {
             switch (state) {
                 case OPENEVSE_STATE_STARTING:
-                    ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_ORANGE "starting up...");
+                    ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_ORANGE "starting up...");
                     break;
                 case OPENEVSE_STATE_NOT_CONNECTED:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
-                        ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer suppying power.");
+                        ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer suppying power.");
                     } else if (_evse_state == OPENEVSE_STATE_SLEEPING) {
-                        ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_ORANGE "waiting for a vehicle...");
+                        ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_ORANGE "waiting for a vehicle...");
                     }
                     break;
                 case OPENEVSE_STATE_CONNECTED:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
-                        ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer supplying power.");
+                        ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer supplying power.");
                     } else {
-                        ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_ORANGE "ready to supply power.");
+                        ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_ORANGE "ready to supply power.");
                     }
                     break;
                 case OPENEVSE_STATE_CHARGING:
-                    ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_LIGHT_GREEN "supplying power...");
+                    ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_BOLD IRC_COLOURS_LIGHT_GREEN "supplying power...");
                     break;
                 case OPENEVSE_STATE_VENT_REQUIRED:
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Vehicle set 'vent required'");
@@ -242,15 +244,15 @@ void irc_event(JsonDocument &data) {
                     break;
                 case OPENEVSE_STATE_SLEEPING:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
-                        ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer supplying power.");
+                        ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer supplying power.");
                     }
-                    ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_ORANGE "sleeping.");
+                    ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_ORANGE "sleeping.");
                     break;
                 case OPENEVSE_STATE_DISABLED:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
-                        ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer supplying power.");
+                        ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer supplying power.");
                     }
-                    ircSendMessage(IRC_CHANNEL, "EVSE is " IRC_COLOURS_ORANGE "disabled.");
+                    ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_ORANGE "disabled.");
                     break;
                 default:
                     break;
@@ -300,6 +302,18 @@ void irc_event(JsonDocument &data) {
 void onIRCConnect() {
     ircJoinChannel(IRC_CHANNEL);
     setAwayStatusFromEVSEState(_evse_state);
+}
+
+void onIRCDisconnect() {  //server has disconnected
+    ircSetNick(IRC_NICK);  //reset nick in case it was changed by nickserv
+#ifdef IRC_SERVER_1
+    if (!_use_backup_irc_server) {
+        ircSetServer(IRC_SERVER_0, IRC_PORT);
+    } else {
+        ircSetServer(IRC_SERVER_1, IRC_PORT);
+    }
+    _use_backup_irc_server = !_use_backup_irc_server;
+#endif //IRC_SERVER_1
 }
 
 void onVoice(const char * from, const char * channel) {
@@ -435,11 +449,12 @@ void onChannelMessage(const char * from, const char * channel, const char * mess
     }
 }
 
-void irc_begin(EvseManager &evse, NetManagerTask &net, LcdTask &lcd, ManualOverride &manual) {
+void irc_begin(EvseManager &evse, NetManagerTask &net, LcdTask &lcd, ManualOverride &manual, unsigned long &last_knock) {
     _evse = &evse;
     _net = &net;
     _lcd = &lcd;
     _manual = &manual;
+    _got_last_knock = &last_knock;
     ircSetClient(wifiClient_irc);
     ircSetDebug(onIRCDebug);
     ircSetOnPrivateMessage(onPrivateMessage);
@@ -457,33 +472,9 @@ void irc_begin(EvseManager &evse, NetManagerTask &net, LcdTask &lcd, ManualOverr
 #ifdef IRC_SERVER_PASSWORD
     ircSetServerPassword(IRC_SERVER_PASSWORD);
 #endif
+    ircSetNick(IRC_NICK);
+    ircSetServer(IRC_SERVER_0, IRC_PORT);  //starts connection to server
 }
-
-void irc_check_connection() {
-    if (!ircConnected()) {
-        ircSetNick(IRC_NICK);
-#ifdef IRC_SERVER_1
-        if (!_use_backup_irc_server) {
-            ircConnect(IRC_SERVER_0, IRC_PORT);
-        } else {
-            ircConnect(IRC_SERVER_1, IRC_PORT);
-        }
-        _use_backup_irc_server = !_use_backup_irc_server;
-#else
-        ircConnect(IRC_SERVER_0, IRC_PORT);
-#endif //IRC_SERVER_1
-    } else {  //irc is connected
-#ifdef IRC_STATUS_INTERVAL
-        if (_evse_state == OPENEVSE_STATE_CHARGING) {
-            uint32_t elapsed = _evse->getSessionElapsed();
-            if (elapsed % IRC_STATUS_INTERVAL <30) {
-                printStatusToIRC(IRC_CHANNEL, false);
-            }
-        }
-#endif //IRC_STATUS_INTERVAL
-    }
-}
-
 
 void irc_disconnect(const char * reason) {
     ircDisconnect(reason);
@@ -495,6 +486,20 @@ void irc_disconnect(const char * reason) {
 // Call every time around loop() if connected to the WiFi
 // -------------------------------------------------------------------
 void irc_loop() {
+    if (time(NULL) > _last_second) {  //on the second
+        _last_second = time(NULL);
+#ifdef IRC_STATUS_INTERVAL
+        if (_evse_state == OPENEVSE_STATE_CHARGING) {
+            uint32_t elapsed = _evse->getSessionElapsed();
+            if (elapsed % IRC_STATUS_INTERVAL == 0) {
+                printStatusToIRC(IRC_CHANNEL, false);
+            }
+        }
+#endif //IRC_STATUS_INTERVAL
+        if (millis() - *_got_last_knock <= 1000) {
+            ircSendMessage(IRC_CHANNEL, "Got knock.");
+        }
+    }
     doIRC();
 }
 

@@ -7,13 +7,13 @@ void setAwayStatusFromEVSEState(uint8_t state);
 void irc_event(JsonDocument &data);
 void printStatusToIRC(const char * target);
 void onIRCConnect();
+void onIRCDisconnect();
 void onVoice(const char * from, const char * channel);
 void onIRCDebug(const char * line);
 void onIRCRaw(const char * line);
 void onPrivateMessage(const char * from, const char * message);
 void onChannelMessage(const char * from, const char * channel, const char * message);
-void irc_begin(EvseManager &evse, NetManagerTask &net, LcdTask &lcd, ManualOverride &manual);
-void irc_check_connection();
+void irc_begin(EvseManager &evse, NetManagerTask &net, LcdTask &lcd, ManualOverride &manual, unsigned long &last_knock);
 void irc_disconnect(const char * reason);
 void irc_loop();
 #endif //IRC_SERVER_0

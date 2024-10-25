@@ -203,7 +203,7 @@ void setup()
 
   //start the IRC bot
 #ifdef IRC_SERVER_0
-  irc_begin(evse, net, lcd, manual);
+  irc_begin(evse, net, lcd, manual, _last_knock);
 #endif //IRC_SERVER_0
 
 #ifdef KNOCK_SENSOR_PIN
@@ -273,10 +273,6 @@ loop() {
           ohm_loop();
         }
       }
-      
-#ifdef IRC_SERVER_0
-      irc_check_connection();
-#endif //IRC_SERVER_0
 
       Timer1 = millis();
     }
