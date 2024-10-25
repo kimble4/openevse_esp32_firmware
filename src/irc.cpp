@@ -177,8 +177,19 @@ void printStatusToIRC(const char * target, bool full) {
     seconds = t % 60;
     char energy_buffer[10];
     get_scaled_number_value(_evse->getSessionEnergy(), 2, "Wh", energy_buffer, sizeof(energy_buffer));
-    snprintf(buffer, sizeof(buffer), "%.1FC, %.1fV × %.2fA = " IRC_COLOURS_BOLD "%.2fkW" IRC_COLOURS_NORMAL ", Elapsed: " IRC_COLOURS_BOLD "%d:%02d:%02d" IRC_COLOURS_NORMAL ", Delivered: " IRC_COLOURS_BOLD "%s" IRC_COLOURS_NORMAL,
-        _evse->getTemperature(EVSE_MONITOR_TEMP_MONITOR), _evse->getVoltage(), _evse->getAmps(), _evse->getPower()/1000.0, hours, minutes, seconds, energy_buffer);
+    char temp_colour[5] = IRC_COLOURS_GREEN;
+    double temp = _evse->getTemperature(EVSE_MONITOR_TEMP_MONITOR);
+    if (temp > 70.0) {
+        snprintf(temp_colour, sizeof(temp_colour), IRC_COLOURS_RED);
+    } else if (temp > 60.0) {
+        snprintf(temp_colour, sizeof(temp_colour), IRC_COLOURS_ORANGE);
+    } else if (temp > 50.0) {
+        snprintf(temp_colour, sizeof(temp_colour), IRC_COLOURS_YELLOW);
+    } else if (temp < 0.0) {
+        snprintf(temp_colour, sizeof(temp_colour), IRC_COLOURS_BLUE);
+    }
+    snprintf(buffer, sizeof(buffer), "%s%.1FC" IRC_COLOURS_NORMAL ", %.1fV × %.2fA = " IRC_COLOURS_BOLD "%.2fkW" IRC_COLOURS_NORMAL ", Elapsed: " IRC_COLOURS_BOLD "%d:%02d:%02d" IRC_COLOURS_NORMAL ", Delivered: " IRC_COLOURS_BOLD "%s" IRC_COLOURS_NORMAL,
+        temp_colour, temp, _evse->getVoltage(), _evse->getAmps(), _evse->getPower()/1000.0, hours, minutes, seconds, energy_buffer);
     ircSendMessage(target, buffer);
 }
 
@@ -204,6 +215,7 @@ void irc_event(JsonDocument &data) {
                 case OPENEVSE_STATE_NOT_CONNECTED:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
                         ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer suppying power.");
+                        printStatusToIRC(IRC_CHANNEL, false);
                     } else if (_evse_state == OPENEVSE_STATE_SLEEPING) {
                         ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_ORANGE "waiting for a vehicle...");
                     }
@@ -211,12 +223,14 @@ void irc_event(JsonDocument &data) {
                 case OPENEVSE_STATE_CONNECTED:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
                         ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer supplying power.");
+                        printStatusToIRC(IRC_CHANNEL, false);
                     } else {
                         ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_ORANGE "ready to supply power.");
                     }
                     break;
                 case OPENEVSE_STATE_CHARGING:
                     ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_BOLD IRC_COLOURS_LIGHT_GREEN "supplying power...");
+                    printStatusToIRC(IRC_CHANNEL, false);
                     break;
                 case OPENEVSE_STATE_VENT_REQUIRED:
                     ircSendMessage(IRC_CHANNEL, IRC_COLOURS_BOLD IRC_COLOURS_RED "ERROR: Vehicle set 'vent required'");
@@ -245,14 +259,18 @@ void irc_event(JsonDocument &data) {
                 case OPENEVSE_STATE_SLEEPING:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
                         ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer supplying power.");
-                    }
-                    ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_ORANGE "sleeping.");
+                        printStatusToIRC(IRC_CHANNEL, false);
+                    } else {
+                        ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_ORANGE "sleeping.");
+                        }
                     break;
                 case OPENEVSE_STATE_DISABLED:
                     if (_evse_state == OPENEVSE_STATE_CHARGING) {
                         ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_BOLD IRC_COLOURS_RED "no longer supplying power.");
+                        printStatusToIRC(IRC_CHANNEL, false);
+                    } else {
+                        ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_ORANGE "disabled.");
                     }
-                    ircSendAction(IRC_CHANNEL, "is " IRC_COLOURS_ORANGE "disabled.");
                     break;
                 default:
                     break;
@@ -288,6 +306,7 @@ void irc_event(JsonDocument &data) {
                     snprintf(buffer, sizeof(buffer), "Charging has stopped!");
                 }
                 ircSendNotice(IRC_CHANNEL, buffer);
+                printStatusToIRC(IRC_CHANNEL, false);
                 _amp_last_reported = amp;
                 _taking_charge = false;
             }
