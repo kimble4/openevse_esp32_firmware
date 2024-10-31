@@ -110,6 +110,7 @@ void setAwayStatusFromEVSEState(uint8_t state) {
 void printStatusToIRC(const char * target, bool full) {
     char buffer[100];
     uint64_t t;
+    uint32_t days;
     uint32_t hours;
     uint32_t minutes;
     uint32_t seconds;
@@ -119,10 +120,11 @@ void printStatusToIRC(const char * target, bool full) {
             snprintf(vehicle_string, sizeof(vehicle_string), IRC_COLOURS_GREEN "connected" IRC_COLOURS_NORMAL);
         }
         t = uptimeMillis() / 1000;
-        hours = t / 3600;
+        days = t / 86400;
+        hours = (t % 86400) / 3600;
         minutes = (t % 3600) / 60;
         seconds = t % 60;
-        snprintf(buffer, sizeof(buffer), "Vehicle is %s.  Current limit " IRC_COLOURS_BOLD "%uA" IRC_COLOURS_NORMAL ", up: %d:%02d:%02d, RSSI: %ddB", vehicle_string, _pilot_amps, hours, minutes, seconds, WiFi.RSSI());
+        snprintf(buffer, sizeof(buffer), "Vehicle is %s.  Current limit " IRC_COLOURS_BOLD "%uA" IRC_COLOURS_NORMAL ", up: %ud %u:%02u:%02u, RSSI: %ddB", vehicle_string, _pilot_amps, days, hours, minutes, seconds, WiFi.RSSI());
         ircSendMessage(target, buffer);
         switch (_evse_state) {
             case OPENEVSE_STATE_STARTING:
@@ -172,7 +174,8 @@ void printStatusToIRC(const char * target, bool full) {
             }
     }
     t = _evse->getSessionElapsed();
-    hours = t / 3600;
+    days = t / 86400;
+    hours = (t % 86400) / 3600;
     minutes = (t % 3600) / 60;
     seconds = t % 60;
     char energy_buffer[10];
@@ -188,8 +191,13 @@ void printStatusToIRC(const char * target, bool full) {
     } else if (temp < 0.0) {
         snprintf(temp_colour, sizeof(temp_colour), IRC_COLOURS_BLUE);
     }
-    snprintf(buffer, sizeof(buffer), "%s%.1FC" IRC_COLOURS_NORMAL ", %.1fV × %.2fA = " IRC_COLOURS_BOLD "%.2fkW" IRC_COLOURS_NORMAL ", Elapsed: " IRC_COLOURS_BOLD "%d:%02d:%02d" IRC_COLOURS_NORMAL ", Delivered: " IRC_COLOURS_BOLD "%s" IRC_COLOURS_NORMAL,
-        temp_colour, temp, _evse->getVoltage(), _evse->getAmps(), _evse->getPower()/1000.0, hours, minutes, seconds, energy_buffer);
+    if (days > 0){
+        snprintf(buffer, sizeof(buffer), "%s%.1FC" IRC_COLOURS_NORMAL ", %.1fV × %.2fA = " IRC_COLOURS_BOLD "%.2fkW" IRC_COLOURS_NORMAL ", Elapsed: " IRC_COLOURS_BOLD "%ud %u:%02u:%02u" IRC_COLOURS_NORMAL ", Delivered: " IRC_COLOURS_BOLD "%s" IRC_COLOURS_NORMAL,
+            temp_colour, temp, _evse->getVoltage(), _evse->getAmps(), _evse->getPower()/1000.0, days, hours, minutes, seconds, energy_buffer);
+    } else {
+        snprintf(buffer, sizeof(buffer), "%s%.1FC" IRC_COLOURS_NORMAL ", %.1fV × %.2fA = " IRC_COLOURS_BOLD "%.2fkW" IRC_COLOURS_NORMAL ", Elapsed: " IRC_COLOURS_BOLD "%u:%02u:%02u" IRC_COLOURS_NORMAL ", Delivered: " IRC_COLOURS_BOLD "%s" IRC_COLOURS_NORMAL,
+            temp_colour, temp, _evse->getVoltage(), _evse->getAmps(), _evse->getPower()/1000.0, hours, minutes, seconds, energy_buffer);
+    }
     ircSendMessage(target, buffer);
 }
 
