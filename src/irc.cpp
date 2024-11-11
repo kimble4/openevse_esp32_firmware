@@ -52,6 +52,7 @@ uint8_t _evse_state = OPENEVSE_STATE_STARTING;
 uint8_t _pilot_amps = 0;
 double _amp = 0.0;
 double _amp_last_reported = 0.0;
+time_t _last_amp_report = 0;
 bool _taking_charge = false;
 #ifdef IRC_SERVER_1
 bool _use_backup_irc_server = false;
@@ -305,6 +306,7 @@ void irc_event(JsonDocument &data) {
                 snprintf(buffer, sizeof(buffer), "Current is now: %.2fA", amp/AMPS_SCALE_FACTOR);
                 ircSendMessage(IRC_CHANNEL, buffer);
                 _amp_last_reported = amp;
+                _last_amp_report = time(NULL);;
             }       
             if (_taking_charge && amp < _amp && amp <= REPORT_CHARGE_FINISHED_CURRENT * AMPS_SCALE_FACTOR) {  //is below finished threshold
                 char buffer[100];
@@ -316,6 +318,7 @@ void irc_event(JsonDocument &data) {
                 ircSendNotice(IRC_CHANNEL, buffer);
                 printStatusToIRC(IRC_CHANNEL, false);
                 _amp_last_reported = amp;
+                _last_amp_report = time(NULL);
                 _taking_charge = false;
             }
             if (amp >= TAKING_CHARGE_CURRENT_THRESHOLD) {
@@ -520,6 +523,13 @@ void irc_loop() {
             uint32_t elapsed = _evse->getSessionElapsed();
             if (elapsed % IRC_STATUS_INTERVAL == 0) {
                 printStatusToIRC(IRC_CHANNEL, false);
+                _amp_last_reported = _amp;
+            } else if (_last_second - _last_amp_report == 30 && abs(_amp - _amp_last_reported) > 0.1 * AMPS_SCALE_FACTOR) {  //get within 0.1A
+                char buffer[100];
+                snprintf(buffer, sizeof(buffer), "Current is now: %.2fA", _amp/AMPS_SCALE_FACTOR);
+                ircSendMessage(IRC_CHANNEL, buffer);
+                _amp_last_reported = _amp;
+                // don't reset _amp_last_reported here, so this only fires once
             }
         }
 #endif //IRC_STATUS_INTERVAL
