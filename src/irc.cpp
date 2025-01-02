@@ -490,6 +490,7 @@ void irc_begin(EvseManager &evse, NetManagerTask &net, LcdTask &lcd, ManualOverr
     ircSetOnPrivateMessage(onPrivateMessage);
     ircSetOnChannelMessage(onChannelMessage);
     ircSetOnConnect(onIRCConnect);
+    ircSetOnDisconnect(onIRCDisconnect);
     ircSetOnVoice(onVoice);
     ircSetOnRaw(onIRCRaw);
     // Get running firmware version from build tag environment variable
